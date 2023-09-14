@@ -5,7 +5,7 @@ import { prisma } from "../lib/prisma";
 import { openai } from "../lib/openai";
 
 export async function createTranscriptionRoute(app: FastifyInstance) {
-  app.post('/videos/:videoId/transcription', async (request) => {
+  app.post('/videos/:videoId/transcription', async (request, reply) => {
     const paramsSchema = z.object({
       videoId: z.string().uuid()
     })
@@ -19,24 +19,31 @@ export async function createTranscriptionRoute(app: FastifyInstance) {
         id: videoId
       }
     })
+    console.log('Chegando aqui!')
     const audioReadStream = createReadStream(video.path)
-    const response = await openai.audio.transcriptions.create({
-      file: audioReadStream,
-      model: 'whisper-1',
-      language: 'pt',
-      response_format: 'json',
-      temperature: 0,
-      prompt
-    })
-    const transcription = response.text
-    await prisma.video.update({
-      where: {
-        id: videoId
-      },
-      data: {
-        transcription
-      }
-    })
-    return transcription
+    try {
+      const response = await openai.audio.transcriptions.create({
+        file: audioReadStream,
+        model: 'whisper-1',
+        language: 'pt',
+        response_format: 'json',
+        temperature: 0,
+        prompt
+      })
+      console.log("🚀 ~ file: create-transcription.ts:31 ~ app.post ~ response:", response)
+      const transcription = response.text
+      await prisma.video.update({
+        where: {
+          id: videoId
+        },
+        data: {
+          transcription
+        }
+      })
+      return transcription
+    } catch (error) {
+      console.log(error)
+      reply.status(500).send({ error: 'Error generating transcription.' })
+    }
   })
 }
